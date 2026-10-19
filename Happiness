@@ -1039,6 +1039,49 @@ for _, p in ipairs(Players:GetPlayers()) do
 end
 
 --========================================================
+-- MM2 AUTO-FARM COINS / CANDY
+--========================================================
+
+MM2AutoFarmActive = false
+
+-- Add the toggle to the page
+MakeToggle(MM2Page, "AUTO-FARM COINS / CANDY", false, function(state)
+    MM2AutoFarmActive = state
+end)
+
+-- The actual farm loop
+task.spawn(function()
+    while task.wait(0.1) do
+        if MM2AutoFarmActive then
+            local char = Player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            
+            if root and hum and hum.Health > 0 then
+                -- Find the main Coins folder in workspace
+                local coinsFolder = workspace:FindFirstChild("Coins")
+                
+                if coinsFolder then
+                    -- Loop through everything inside the Coins folder
+                    for _, obj in ipairs(coinsFolder:GetDescendants()) do
+                        if MM2AutoFarmActive == false then break end -- Stop if toggled off
+                        
+                        -- We only want the actual parts we can touch
+                        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+                            -- Check if it's not an empty folder and is actually visible
+                            if obj.Transparency < 1 then
+                                root.CFrame = obj.CFrame
+                                task.wait(0.01)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+--========================================================
 -- OTHER PAGES
 --========================================================
 
