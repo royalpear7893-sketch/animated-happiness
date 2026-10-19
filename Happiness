@@ -868,6 +868,7 @@ function MakeToggle(parent, text, default, callback)
     end)
     return Holder
 end
+
 --========================================================
 -- PART 4: PAGE DEFINITIONS & PREMIUM SELECTOR
 --========================================================
@@ -882,8 +883,165 @@ AddText(MM2Page, "Player information and visual utilities", 22, C.Gray)
 
 MM2BackButton = MakeBackButton(MM2Page, function() SelectPage("Scripts") end)
 table.insert(BackButtons, MM2BackButton)
-ESPEnabled = false
-MakeToggle(MM2Page, "ESP", false, function(state) ESPEnabled = state end)
+
+--========================================================
+-- MM2 ESP LOGIC (ROLES & HIGHLIGHTS)
+--========================================================
+
+MM2ESPEnabled = false
+MM2ESPData = {}
+
+function GetMM2Role(player)
+    if not player.Character then return "Innocent", Color3.fromRGB(0, 255, 100) end
+    
+    local backpack = player:FindFirstChild("Backpack")
+    local char = player.Character
+    
+    local hasKnife = false
+    local hasGun = false
+    
+    -- Check Backpack
+    if backpack then
+        if backpack:FindFirstChild("Knife") then hasKnife = true end
+        if backpack:FindFirstChild("Gun") or backpack:FindFirstChild("Revolver") then hasGun = true end
+    end
+    
+    -- Check Character (if they are holding it)
+    if char:FindFirstChild("Knife") then hasKnife = true end
+    if char:FindFirstChild("Gun") or char:FindFirstChild("Revolver") then hasGun = true end
+
+    if hasKnife then
+        return "MURDERER", Color3.fromRGB(255, 30, 30) -- Red
+    elseif hasGun then
+        return "SHERIFF", Color3.fromRGB(50, 150, 255) -- Blue
+    else
+        return "INNOCENT", Color3.fromRGB(50, 255, 100) -- Green
+    end
+end
+
+function CreateMM2ESP(player)
+    if player == Player or MM2ESPData[player] then return end
+    local char = player.Character
+    if not char then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "MM2_ESP_HIGHLIGHT"
+    highlight.Adornee = char
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = char
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "MM2_ESP_BILLBOARD"
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Adornee = char.Head or char:FindFirstChild("HumanoidRootPart")
+    billboard.Parent = char
+
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.TextStrokeTransparency = 0
+    text.Font = Enum.Font.GothamBold
+    text.TextSize = 14
+    text.Parent = billboard
+
+    MM2ESPData[player] = {
+        Highlight = highlight,
+        Billboard = billboard,
+        TextLabel = text
+    }
+end
+
+function RemoveMM2ESP(player)
+    local data = MM2ESPData[player]
+    if data then
+        if data.Highlight then data.Highlight:Destroy() end
+        if data.Billboard then data.Billboard:Destroy() end
+        MM2ESPData[player] = nil
+    end
+end
+
+-- Loop to update colors and text constantly
+RunService = game:GetService("RunService")
+RunService.RenderStepped:Connect(function()
+    if not MM2ESPEnabled then return end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Player and p.Character then
+            local data = MM2ESPData[p]
+            if data then
+                local roleName, roleColor = GetMM2Role(p)
+                
+                -- Update Highlight
+                if data.Highlight then
+                    data.Highlight.FillColor = roleColor
+                    data.Highlight.OutlineColor = roleColor
+                end
+                
+                -- Update Billboard Text
+                if data.TextLabel then
+                    data.TextLabel.Text = roleName .. "\n" .. p.Name
+                    data.TextLabel.TextColor3 = roleColor
+                end
+            end
+        end
+    end
+end)
+
+-- ESP Toggle
+MakeToggle(MM2Page, "ROLE ESP (Murderer / Sheriff / Innocent)", false, function(state)
+    MM2ESPEnabled = state
+    if state then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= Player then
+                CreateMM2ESP(p)
+            end
+        end
+    else
+        for p, _ in pairs(MM2ESPData) do
+            RemoveMM2ESP(p)
+        end
+    end
+end)
+
+-- Handle players joining/leaving while ESP is active
+Players.PlayerAdded:Connect(function(p)
+    if MM2ESPEnabled then
+        task.wait(1)
+        CreateMM2ESP(p)
+    end
+    p.CharacterAdded:Connect(function()
+        if MM2ESPEnabled then
+            RemoveMM2ESP(p)
+            task.wait(0.5)
+            CreateMM2ESP(p)
+        end
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    RemoveMM2ESP(p)
+end)
+
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= Player then
+        p.CharacterAdded:Connect(function()
+            if MM2ESPEnabled then
+                RemoveMM2ESP(p)
+                task.wait(0.5)
+                CreateMM2ESP(p)
+            end
+        end)
+    end
+end
+
+--========================================================
+-- OTHER PAGES
+--========================================================
+
 MM2Entry = MakeGameEntry(ScriptsPage, "Murder Mystery 2", "Player information and visual utilities")
 
 HomePage = CreatePage("Home")
@@ -1064,6 +1222,7 @@ function MakePremiumSelector(parent, yPos, title, onSelect)
 end
 
 print("PERFECT PREMIUM SELECTOR HELPER LOADED")
+
 --========================================================
 -- PART 5: ADVANCED AIMBOT UI (PART 1)
 --========================================================
