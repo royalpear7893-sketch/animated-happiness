@@ -900,22 +900,20 @@ function GetMM2Role(player)
     local hasKnife = false
     local hasGun = false
     
-    -- Check Backpack
     if backpack then
         if backpack:FindFirstChild("Knife") then hasKnife = true end
         if backpack:FindFirstChild("Gun") or backpack:FindFirstChild("Revolver") then hasGun = true end
     end
     
-    -- Check Character (if they are holding it)
     if char:FindFirstChild("Knife") then hasKnife = true end
     if char:FindFirstChild("Gun") or char:FindFirstChild("Revolver") then hasGun = true end
 
     if hasKnife then
-        return "MURDERER", Color3.fromRGB(255, 30, 30) -- Red
+        return "MURDERER", Color3.fromRGB(255, 30, 30)
     elseif hasGun then
-        return "SHERIFF", Color3.fromRGB(50, 150, 255) -- Blue
+        return "SHERIFF", Color3.fromRGB(50, 150, 255)
     else
-        return "INNOCENT", Color3.fromRGB(50, 255, 100) -- Green
+        return "INNOCENT", Color3.fromRGB(50, 255, 100)
     end
 end
 
@@ -964,7 +962,6 @@ function RemoveMM2ESP(player)
     end
 end
 
--- Loop to update colors and text constantly
 RunService = game:GetService("RunService")
 RunService.RenderStepped:Connect(function()
     if not MM2ESPEnabled then return end
@@ -974,14 +971,10 @@ RunService.RenderStepped:Connect(function()
             local data = MM2ESPData[p]
             if data then
                 local roleName, roleColor = GetMM2Role(p)
-                
-                -- Update Highlight
                 if data.Highlight then
                     data.Highlight.FillColor = roleColor
                     data.Highlight.OutlineColor = roleColor
                 end
-                
-                -- Update Billboard Text
                 if data.TextLabel then
                     data.TextLabel.Text = roleName .. "\n" .. p.Name
                     data.TextLabel.TextColor3 = roleColor
@@ -991,7 +984,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ESP Toggle
 MakeToggle(MM2Page, "ROLE ESP (Murderer / Sheriff / Innocent)", false, function(state)
     MM2ESPEnabled = state
     if state then
@@ -1007,7 +999,6 @@ MakeToggle(MM2Page, "ROLE ESP (Murderer / Sheriff / Innocent)", false, function(
     end
 end)
 
--- Handle players joining/leaving while ESP is active
 Players.PlayerAdded:Connect(function(p)
     if MM2ESPEnabled then
         task.wait(1)
@@ -1039,17 +1030,17 @@ for _, p in ipairs(Players:GetPlayers()) do
 end
 
 --========================================================
--- MM2 AUTO-FARM COINS / CANDY
+-- MM2 AUTO-FARM COINS (ZYN-IC LOGIC)
 --========================================================
 
 MM2AutoFarmActive = false
+local TweenService = game:GetService("TweenService")
 
--- Add the toggle to the page
 MakeToggle(MM2Page, "AUTO-FARM COINS / CANDY", false, function(state)
     MM2AutoFarmActive = state
 end)
 
--- The actual farm loop
+-- Core farm loop adapted from Zyn-ic's source [citation:2]
 task.spawn(function()
     while task.wait(0.1) do
         if MM2AutoFarmActive then
@@ -1058,22 +1049,42 @@ task.spawn(function()
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             
             if root and hum and hum.Health > 0 then
-                -- Find the main Coins folder in workspace
-                local coinsFolder = workspace:FindFirstChild("Coins")
+                -- Find the coin container (handles both standard and event maps) [citation:2]
+                local map = workspace:FindFirstChild("Map") or workspace
+                local coinContainer = map:FindFirstChild("CoinContainer") 
+                    or map:FindFirstChild("Coins") 
+                    or workspace:FindFirstChild("Coins")
                 
-                if coinsFolder then
-                    -- Loop through everything inside the Coins folder
-                    for _, obj in ipairs(coinsFolder:GetDescendants()) do
-                        if MM2AutoFarmActive == false then break end -- Stop if toggled off
-                        
-                        -- We only want the actual parts we can touch
-                        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
-                            -- Check if it's not an empty folder and is actually visible
-                            if obj.Transparency < 1 then
-                                root.CFrame = obj.CFrame
-                                task.wait(0.01)
+                if coinContainer then
+                    local closestCoin = nil
+                    local shortestDist = 100 -- Max distance to search (studs)
+                    
+                    -- Find nearest visible coin part
+                    for _, obj in ipairs(coinContainer:GetDescendants()) do
+                        if obj:IsA("BasePart") and obj.Transparency < 1 then
+                            local dist = (obj.Position - root.Position).Magnitude
+                            if dist < shortestDist then
+                                closestCoin = obj
+                                shortestDist = dist
                             end
                         end
+                    end
+                    
+                    if closestCoin then
+                        -- Smooth tween to coin (avoids anti-cheat teleport detection) [citation:2]
+                        local duration = math.clamp(shortestDist / 100, 0.1, 0.5) -- Speed based on distance
+                        local tween = TweenService:Create(
+                            root, 
+                            TweenInfo.new(duration, Enum.EasingStyle.Linear), 
+                            {CFrame = closestCoin.CFrame}
+                        )
+                        tween:Play()
+                        tween.Completed:Wait()
+                        
+                        -- Wait for server to register the touch [citation:2]
+                        task.wait(0.2)
+                    else
+                        task.wait(0.5)
                     end
                 end
             end
